@@ -1,0 +1,77 @@
+---
+title: "Toggl Time Tracking"
+author: "Jason Entingh"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library, include=FALSE}
+library(tidyverse)
+library(httr2)
+library(jsonlite)
+library(purrr)
+```
+
+# API configuration
+
+```{r}
+api_token <- readLines("API/toggl_API.txt")
+base_url <- "https://toggl.com"
+```
+
+# API request
+
+```{r time_api, include=FALSE}
+
+# time entries
+resp_time <- request("https://api.track.toggl.com/api/v9/me/time_entries") |>
+  req_auth_basic(api_token, "api_token") |>
+  req_perform()
+
+entries <- fromJSON(resp_body_string(resp_time))
+
+```
+
+```{r projects_api, include=FALSE}
+
+# projects
+resp_projects <- request("https://api.track.toggl.com/api/v9/me/projects") |>
+  req_auth_basic(api_token, "api_token") |>
+  req_perform()
+
+projects <- fromJSON(resp_body_string(resp_ws))
+
+project_names <- projects |> 
+  rename(
+    project = name,
+    project_id = id
+  ) |> 
+  select(project, project_id)
+
+```
+
+# merge project names with entries data
+
+```{r}
+
+entries_clean <- entries |> 
+  # merge project names
+  left_join(project_names, by = join_by("project_id")) |> 
+  # select vars
+  select(
+    billable,
+    start,
+    stop,
+    duration,
+    description,
+    at,
+    project
+  )
+
+```
+
+
