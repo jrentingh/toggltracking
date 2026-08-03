@@ -43,7 +43,7 @@ resp_projects <- request("https://api.track.toggl.com/api/v9/me/projects") |>
   req_auth_basic(api_token, "api_token") |>
   req_perform()
 
-projects <- fromJSON(resp_body_string(resp_ws))
+projects <- fromJSON(resp_body_string(resp_projects))
 
 project_names <- projects |> 
   rename(
@@ -68,10 +68,21 @@ entries_clean <- entries |>
     stop,
     duration,
     description,
-    at,
     project
+  ) |> 
+  # clean time vars
+  mutate(
+    start = with_tz(ymd_hms(start),"America/Detroit"),
+    stop = with_tz(ymd_hms(stop), "America/Detroit")
   )
 
 ```
 
+# create levels table
+
+```{r}
+
+levels <- read_csv("data/levels.csv")
+
+```
 
