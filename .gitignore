@@ -50,3 +50,6 @@ rsconnect/
 
 # Toggl API token
 API/*.txt
+
+# images
+images/
