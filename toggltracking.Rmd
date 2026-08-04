@@ -14,6 +14,8 @@ library(tidyverse)
 library(httr2)
 library(jsonlite)
 library(purrr)
+library(readxl)
+library(writexl)
 ```
 
 # API configuration
@@ -73,16 +75,55 @@ entries_clean <- entries |>
   # clean time vars
   mutate(
     start = with_tz(ymd_hms(start),"America/Detroit"),
-    stop = with_tz(ymd_hms(stop), "America/Detroit")
+    stop = with_tz(ymd_hms(stop), "America/Detroit"),
+    duration_hrs = round(duration / 60 / 60, 2)
   )
 
 ```
+
+# PLACEHOLDER TEST DATA
+
+```{r}
+
+entries_clean <- read_xlsx("data/entries_clean_testdata.xlsx")
+
+```
+
 
 # create levels table
 
 ```{r}
 
-levels <- read_csv("data/levels.csv")
+levels <- read_csv("data/levels_v2.csv")
+
+```
+
+# collapse entries data
+
+```{r}
+
+entries_alltime <- entries_clean |> 
+  group_by(project) |> 
+  summarize(
+    sum_hours = sum(duration_hrs, na.rm = TRUE)
+  ) |> 
+  arrange(desc(sum_hours))
+
+```
+
+# join entries and levels
+
+```{r}
+
+status <- entries_alltime |> 
+  left_join(levels, join_by(sum_hours >= hours)) |> 
+  # generate label
+  mutate(
+    label = case_when(
+      !is.na(tier) & !is.na(rank) ~ paste0(tier, " ", rank),
+      .default = NA_character_
+    )
+  )
 
 ```
 
