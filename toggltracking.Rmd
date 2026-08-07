@@ -3,6 +3,7 @@ title: "Toggl Time Tracking"
 author: "Jason Entingh"
 date: "`r Sys.Date()`"
 output: html_document
+runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
@@ -17,6 +18,7 @@ library(purrr)
 library(readxl)
 library(writexl)
 library(webr)
+library(rsconnect)
 ```
 
 # API configuration
@@ -26,9 +28,19 @@ api_token <- readLines("API/toggl_API.txt")
 base_url <- "https://toggl.com"
 ```
 
+```{r}
+message("File exists: ", file.exists("API/toggl_API.txt"))
+message("Files deployed:")
+message(paste(list.files(recursive = TRUE), collapse = "\n"))
+
+api_token <- trimws(readLines("API/toggl_API.txt"))
+message("Token length: ", nchar(api_token))
+```
+
+
 # API request
 
-```{r time_api, include=FALSE}
+```{r}
 
 # time entries
 resp_time <- request("https://api.track.toggl.com/api/v9/me/time_entries") |>
@@ -39,7 +51,7 @@ entries <- fromJSON(resp_body_string(resp_time))
 
 ```
 
-```{r projects_api, include=FALSE}
+```{r}
 
 # projects
 resp_projects <- request("https://api.track.toggl.com/api/v9/me/projects") |>
@@ -137,145 +149,6 @@ status <- entries_alltime |>
 
 library(shiny)
 library(shinyMobile)
-
-app_opts <- list(
-  theme = "ios",
-  dark = "auto",
-  skeletonsOnLoad = FALSE,
-  preloader = FALSE,
-  filled = FALSE,
-  color = "#007aff",
-  touch = list(
-    touchClicksDistanceThreshold = 5,
-    tapHold = TRUE,
-    tapHoldDelay = 750,
-    tapHoldPreventClicks = TRUE,
-    iosTouchRipple = FALSE,
-    mdTouchRipple = TRUE
-  ),
-  iosTranslucentBars = FALSE,
-  navbar = list(
-    iosCenterTitle = TRUE,
-    hideOnPageScroll = TRUE
-  ),
-  toolbar = list(
-    hideOnPageScroll = FALSE
-  ),
-  pullToRefresh = FALSE
-)
-
-shinyApp(
-  ui = f7Page(
-    options = app_opts,
-    title = "shinyMobile Sandbox",
-    f7TabLayout(
-      panels = tagList(
-        f7Panel(
-          id = "mypanel1",
-          side = "left",
-          effect = "push",
-          title = "Left panel",
-          f7Block("A panel with push effect"),
-          f7PanelMenu(
-            id = "menu",
-            f7PanelItem(
-              tabName = "Tab1",
-              title = "Tab 1",
-              icon = f7Icon("folder"),
-              active = TRUE
-            ),
-            f7PanelItem(
-              tabName = "Tab2",
-              title = "Tab 2",
-              icon = f7Icon("keyboard")
-            ),
-            f7PanelItem(
-              tabName = "Tab3",
-              title = "Tab 3",
-              icon = f7Icon("layers_alt")
-            )
-          )
-        ),
-        f7Panel(
-          id = "mypanel2",
-          side = "right",
-          effect = "floating",
-          title = "Right panel",
-          f7Block(
-            "A panel with cover effect"
-          )
-        )
-      ),
-      navbar = f7Navbar(
-        title = "shinyMobile Sandbox",
-        hairline = TRUE,
-        leftPanel = TRUE,
-        rightPanel = TRUE
-      ),
-      f7Tabs(
-        id = "tabs",
-        animated = TRUE,
-        #swipeable = TRUE,
-        f7Tab(
-          title = "Tab 1",
-          tabName = "Tab1",
-          icon = f7Icon("folder"),
-          active = TRUE,
-          lapply(1:30, function(i) {
-            f7Card(title = sprintf("Card %s", i),
-                   p(sprintf("Content %s", i)))
-          })
-        ),
-        f7Tab(
-          title = "Tab 2",
-          tabName = "Tab2",
-          icon = f7Icon("keyboard"),
-          f7Card(
-            title = "Card header",
-            "A card"
-          )
-        ),
-        f7Tab(
-          title = "Tab 3",
-          tabName = "Tab3",
-          icon = f7Icon("layers_alt"),
-          f7Card(
-            title = "Card header",
-            f7SmartSelect(
-              inputId = "variable",
-              label = "Variables to show:",
-              choices = c("Cylinders" = "cyl",
-                          "Transmission" = "am",
-                          "Gears" = "gear"),
-              openIn = "sheet",
-              multiple = TRUE
-            ),
-            tableOutput("data")
-          )
-        )
-      )
-    )
-  ),
-  server = function(input, output, session) {
-    # update tabs depending on side panel
-    observeEvent(input$menu, {
-      updateF7Tabs(id = "tabs",
-                   selected = input$menu,
-                   session = session)
-    })
-
-    # datatable
-    output$data <- renderTable({
-      mtcars[, c("mpg", input$variable), drop = FALSE]
-    }, rownames = TRUE)
-  }
-)
-
-```
-
-## chatgpt version
-
-```{r}
 
 ui <- f7Page(
   title = "Projects",
