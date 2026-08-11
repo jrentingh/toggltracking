@@ -71,6 +71,12 @@ entries_alltime <- entries_clean |>
 # join entries and levels
 status <- entries_alltime |> 
   left_join(levels, join_by(sum_hours >= hours)) |> 
+  # keep highest match from levels
+  group_by(project) |> 
+  slice_max(level, n = 1, with_ties = FALSE) |> 
+  ungroup() |> 
+  # drop unranked
+  filter(!is.na(level)) |> 
   # generate label
   mutate(
     rank = case_when(
