@@ -1,6 +1,4 @@
-
 # library
-
 library(shiny)
 library(shinyMobile)
 library(tidyverse)
