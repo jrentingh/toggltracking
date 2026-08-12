@@ -10,6 +10,8 @@ library(writexl)
 library(webr)
 library(rsconnect)
 
+# API -------------------------------------------------------------------------
+
 # api configuration
 api_token <- readLines("API/toggl_API.txt")
 base_url <- "https://toggl.com"
@@ -25,6 +27,8 @@ entries <- fromJSON(resp_body_string(resp_time))
 resp_projects <- request("https://api.track.toggl.com/api/v9/me/projects") |>
   req_auth_basic(api_token, "api_token") |>
   req_perform()
+
+# data cleaning ----------------------------------------------------------------
 
 projects <- fromJSON(resp_body_string(resp_projects))
 
@@ -66,33 +70,37 @@ entries_alltime <- entries_clean |>
   ) |> 
   arrange(desc(sum_hours))
 
-# join entries and levels
+# join levels data
 status <- entries_alltime |> 
   left_join(levels, join_by(sum_hours >= hours)) |> 
+  rename(level_hours = hours) |> 
   # keep highest match from levels
   group_by(project) |> 
   slice_max(level, n = 1, with_ties = FALSE) |> 
   ungroup() |> 
+  # generate labels
+  mutate(
+    short_label = if_else(!is.na(level), paste0(guild, " ", rank), NA_character_),
+    long_label = if_else(!is.na(level), paste0("Lvl. ", level, " ", guild, " ", rank), NA_character_)
+  )
+  
+  
+status_output <- status |> 
   # drop unranked
   filter(!is.na(level)) |> 
-  # generate label
+  # generate image filepath
   mutate(
-    rank = case_when(
-      is.na(level) ~ "Unranked",
-      .default = rank
-    ),
-    guild = case_when(
-      is.na(level) ~ "Unranked",
-      .default = guild
-    ),
-    label = case_when(
-      !is.na(level) ~ paste0(guild, " ", rank),
-      .default = "No Rank"
+    image_file = paste0(
+      tolower(gsub(" ", "_", guild)), 
+      "_", 
+      tolower(gsub(" ", "_", rank)), 
+      ".png"
     )
   ) |> 
   arrange(project)
+  
 
-# shiny build
+# shiny build -----------------------------------------------
 
 ui <- f7Page(
   title = "Projects",
@@ -108,33 +116,50 @@ server <- function(input, output, session) {
   
   output$project_cards <- renderUI({
     
-    cards <- lapply(seq_len(nrow(status)), function(i) {
+    cards <- lapply(seq_len(nrow(status_output)), function(i) {
       
       f7Card(
         
+        # whole card layout - text on left, image on right
         div(
           style = "
             display:flex;
-            justify-content:space-between;
+            justify-content:space-between; 
+            align-items:center; width:100%;
+          ",
+        
+        ## left side: project name
+        div(
+          style = "
+            display:flex;
             align-items:baseline;
-            margin-bottom:8px;
+            margin-bottom:0px;
           ",
           
           h3(
-            status$project[i],
+            status_output$project[i],
             style = "margin:0,"
-          ),
-          
-          span(
-            sprintf("%.1f hours", status$sum_hours[i]),
-            style = "
+          )
+        ),
+        
+        ## left side: hours 
+        div(
+          style = "
+          display:flex;
+          align-items:baseline;
+          margin-bottom:4px;
+        ",
+
+        span(
+            sprintf("%.1f hours", status_output$sum_hours[i]),
+          style = "
               font-weight:600;
               color:#666;
             "
           )
         ),
         
-        # Tier row
+        # lleft side: ong label
         div(
           style = "
               display:flex;
@@ -143,22 +168,30 @@ server <- function(input, output, session) {
               gap:6px;
             ",
           
-          span(sprintf("%s Guild", status$guild[i])),
-          f7Icon("star_fill")
+          status_output$long_label[i]
         ),
         
-        # Rank row
         div(
-          style = "
-              display:flex;
-              align-items:center;
-              margin-bottom:8px;
-              gap:6px
-            ",
+          style = " 
+          flex:0 0 140px;
+          display:flex;
+          justify-content:center;
+          align-items:center; 
+        ",
           
-          span(sprintf("Rank: %s", status$rank[i])),
-          f7Icon("person_fill")
-        ),
+          tags$img( 
+            src = paste0(
+              "images/", 
+              status_output$image_file[i] 
+            ), 
+            style = " 
+              width:140px; 
+              height:140px; 
+              object-fit:contain; 
+            "
+            )
+          )
+        )
       )
       
     })
@@ -168,5 +201,7 @@ server <- function(input, output, session) {
   })
   
 }
+
+
 
 shinyApp(ui, server)
