@@ -1,4 +1,5 @@
-# library
+
+# library ---------------------------------------------------------------------
 library(shiny)
 library(shinyMobile)
 library(tidyverse)
@@ -28,7 +29,7 @@ resp_projects <- request("https://api.track.toggl.com/api/v9/me/projects") |>
   req_auth_basic(api_token, "api_token") |>
   req_perform()
 
-# data cleaning ----------------------------------------------------------------
+# data cleaning ---------------------------------------------------------------
 
 projects <- fromJSON(resp_body_string(resp_projects))
 
@@ -100,7 +101,7 @@ status_output <- status |>
   arrange(project)
   
 
-# shiny build -----------------------------------------------
+# shiny build -----------------------------------------------------------------
 
 ui <- f7Page(
   title = "Projects",
@@ -120,86 +121,91 @@ server <- function(input, output, session) {
       
       f7Card(
         
-        # whole card layout - text on left, image on right
+        # ============================================================
+        # LEVEL 1: Card
+        # ============================================================
         div(
           style = "
             display:flex;
-            justify-content:space-between; 
-            align-items:center; width:100%;
-          ",
-        
-        ## left side: project name
-        div(
-          style = "
-            display:flex;
-            align-items:baseline;
-            margin-bottom:0px;
+            justify-content:space-between;
+            align-items:center;
+            width:100%;
+            gap:20px;
           ",
           
-          h3(
-            status_output$project[i],
-            style = "margin:0,"
-          )
-        ),
-        
-        ## left side: hours 
-        div(
-          style = "
-          display:flex;
-          align-items:baseline;
-          margin-bottom:4px;
-        ",
-
-        span(
-            sprintf("%.1f hours", status_output$sum_hours[i]),
-          style = "
-              font-weight:600;
-              color:#666;
-            "
-          )
-        ),
-        
-        # lleft side: ong label
-        div(
-          style = "
+          # ----------------------------------------------------------
+          # LEVEL 2: Left side — text/content
+          # ----------------------------------------------------------
+          div(
+            style = "
+              flex:1;
               display:flex;
-              align-items:center;
-              margin-bottom:4px;
-              gap:6px;
+              flex-direction:column;
+              justify-content:center;
             ",
-          
-          status_output$long_label[i]
-        ),
-        
-        div(
-          style = " 
-          flex:0 0 140px;
-          display:flex;
-          justify-content:center;
-          align-items:center; 
-        ",
-          
-          tags$img( 
-            src = paste0(
-              "images/", 
-              status_output$image_file[i] 
-            ), 
-            style = " 
-              width:140px; 
-              height:140px; 
-              object-fit:contain; 
-            "
-            )
-          )
+            
+            # LEVEL 3: Project name
+            div(
+              style = "
+                display:flex;
+                align-items:baseline;
+                margin-bottom:6px;
+              ",
+              h3(
+                status_output$project[i],
+                style = "margin:0;"
+                )
+              ),
+            # LEVEL 3: Project hours
+            div(
+              style = "
+                display:flex;
+                align-items:baseline;
+                margin-bottom:6px;
+              ",
+              span(
+                sprintf("%.1f hours", status_output$sum_hours[i]),
+                style = "
+                  font-weight:600;
+                  color:#666;
+                "
+                )
+              ),
+            # LEVEL 3: Long label (Lvl. x [Guild] [Rank])
+            div(
+              style = "
+                display:flex;
+                align-items:center;
+                gap:6px;
+              ",
+              status_output$long_label[i]
+              )
+            ), # ------------END LEVEL 2: Left side ------------------
+          # ----------------------------------------------------------
+          # LEVEL 2: Right side — image
+          # ----------------------------------------------------------
+          div(
+            style = "
+              flex:0 0 140px;
+              display:flex;
+              justify-content:center;
+              align-items:center;
+            ",
+            # LEVEL 3: Image
+            tags$img(
+              src = paste0("images/", status_output$image_file[i]),
+              style = "
+                width:140px;
+                height:140px;
+                object-fit:contain;
+              "
+              )
+            ) # ------------ END LEVEL 2: Right side ----------------
+          ) # ================ END LEVEL 1: CARD ====================
         )
-      )
-      
-    })
-    
+      })
     tagList(cards)
-    
-  })
-  
+    })
 }
 
 
