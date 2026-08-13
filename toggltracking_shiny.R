@@ -79,6 +79,14 @@ status <- entries_alltime |>
   group_by(project) |> 
   slice_max(level, n = 1, with_ties = FALSE) |> 
   ungroup() |> 
+  # calculate next level hours 
+  mutate(
+    next_level_hours = map_dbl(
+      sum_hours, # take sum_hous as an input
+      ~ min(levels$hours[levels$hours > .x], na.rm = TRUE) # lookup the minimum value of levels$hours, where sum_hours is > levels$hours
+    ),
+    hours_to_next_level = next_level_hours - sum_hours
+  ) |> 
   # generate labels
   mutate(
     short_label = if_else(!is.na(level), paste0(guild, " ", rank), NA_character_),
@@ -151,7 +159,7 @@ server <- function(input, output, session) {
                 align-items:baseline;
                 margin-bottom:6px;
               ",
-              h3(
+              h2(
                 status_output$project[i],
                 style = "margin:0;"
                 )
@@ -179,7 +187,22 @@ server <- function(input, output, session) {
                 gap:6px;
               ",
               status_output$long_label[i]
-              )
+              ),
+            div(
+              style = "
+                display:flex;
+                align-items:center;
+                gap:6px;
+              ",
+              paste0(
+                floor(status_output$hours_to_next_level[i]),
+                "h",
+                " ",
+                round((status_output$hours_to_next_level[i] %% 1) * 60),
+                "m",
+                " to next level"
+                  )
+                )
             ), # ------------END LEVEL 2: Left side ------------------
           # ----------------------------------------------------------
           # LEVEL 2: Right side — image
