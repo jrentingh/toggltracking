@@ -18,7 +18,12 @@ api_token <- readLines("API/toggl_API.txt")
 base_url <- "https://toggl.com"
 
 # API request - time entries
+# will eventually need a way to iterate this on a weekly/monthly basis, as I believe it limits out at 1,000 entries.
 resp_time <- request("https://api.track.toggl.com/api/v9/me/time_entries") |>
+  req_url_query(
+    start_date = "2026-07-31",
+    end_date = paste0(as.character(Sys.Date()), "T23:59:59Z")
+  ) |> 
   req_auth_basic(api_token, "api_token") |>
   req_perform()
 
@@ -29,9 +34,9 @@ resp_projects <- request("https://api.track.toggl.com/api/v9/me/projects") |>
   req_auth_basic(api_token, "api_token") |>
   req_perform()
 
-# data cleaning ---------------------------------------------------------------
-
 projects <- fromJSON(resp_body_string(resp_projects))
+
+# data cleaning ---------------------------------------------------------------
 
 project_names <- projects |> 
   rename(
