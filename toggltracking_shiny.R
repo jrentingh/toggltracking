@@ -122,7 +122,37 @@ ui <- f7Page(
   f7SingleLayout(
     navbar = f7Navbar(title = "Projects"),
     
-    uiOutput("project_cards")
+    f7Tabs(
+      id = "Tabs",
+      
+      # ==================================================
+      # PROJECT LIST
+      # ==================================================
+      
+      f7Tab(
+        tabName = "projects",
+        active = TRUE,
+        uiOutput("project_cards")
+      ),
+      
+      # ==================================================
+      # DETAIL PAGE
+      # ===================================================
+      
+      f7Tab(
+        tabName = "project_detail",
+        hidden = TRUE,
+        
+        f7Navbar(
+          title = "Project Details",
+          backLink = TRUE
+        ),
+        
+        f7Block(
+          h2(textOutput("selected_project"))
+        )
+      )
+    )
   )
 )
 
@@ -133,6 +163,17 @@ server <- function(input, output, session) {
     cards <- lapply(seq_len(nrow(status_output)), function(i) {
       
       f7Card(
+        
+        # make card clickable
+        div(
+          onclick = sprintf(
+            "Shiny.setInputValue(
+              'selected_project',
+              %d,
+              {priority: 'event'}
+            )",
+            i
+          ),
         
         # ============================================================
         # LEVEL 1: Card
@@ -227,13 +268,40 @@ server <- function(input, output, session) {
                 height:140px;
                 object-fit:contain;
               "
-              )
+              ),
+            style = "
+                width:140px;
+                height:140px;
+                object-fit:contain;
+              "
             ) # ------------ END LEVEL 2: Right side ----------------
           ) # ================ END LEVEL 1: CARD ====================
         )
-      })
-    tagList(cards)
+      )
+     })
+  tagList(cards)
+})
+  # ==============================================================
+  # WHEN A CARD IS CLICKED
+  # ==============================================================
+  
+  observeEvent(input$selected_project, {
+    
+    # Get the selected row
+    selected <- input$selected_project
+    
+    # Put the project name on the detail page
+    output$selected_project <- renderText({
+      status_output$project[selected]
     })
+    
+    # Navigate to detail tab
+    updateF7Tabs(
+      id = "tabs",
+      selected = "project_detail",
+      session = session
+    )
+  })
 }
 
 
