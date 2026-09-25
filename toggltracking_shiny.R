@@ -62,6 +62,10 @@ entries_clean <- entries |>
   mutate(
     start = with_tz(ymd_hms(start),"America/Detroit"),
     stop = with_tz(ymd_hms(stop), "America/Detroit"),
+    date = date(with_tz(date(stop), "America/Detroit")),
+    week = week(date),
+    week_date = floor_date(date, unit = "week"),
+    year = year(date),
     duration_hrs = round(duration / 60 / 60, 2)
   )
 
@@ -115,15 +119,16 @@ status_output <- status |>
   
 
 # shiny build -----------------------------------------------------------------
-
 ui <- f7Page(
   title = "Projects",
   
   f7SingleLayout(
-    navbar = f7Navbar(title = "Projects"),
+    navbar = f7Navbar(
+      title = "Projects"
+    ),
     
     f7Tabs(
-      id = "Tabs",
+      id = "tabs",
       
       # ==================================================
       # PROJECT LIST
@@ -132,12 +137,13 @@ ui <- f7Page(
       f7Tab(
         tabName = "projects",
         active = TRUE,
+        
         uiOutput("project_cards")
       ),
       
       # ==================================================
       # DETAIL PAGE
-      # ===================================================
+      # ==================================================
       
       f7Tab(
         tabName = "project_detail",
@@ -149,150 +155,187 @@ ui <- f7Page(
         ),
         
         f7Block(
-          h2(textOutput("selected_project"))
+          h2(
+            textOutput("selected_project")
+          ),
+          
+          plotOutput(
+            "effort_trend",
+            height = "180px"
+          )
         )
       )
     )
   )
 )
 
+
 server <- function(input, output, session) {
+  
+  # ==============================================================
+  # PROJECT CARDS
+  # ==============================================================
   
   output$project_cards <- renderUI({
     
-    cards <- lapply(seq_len(nrow(status_output)), function(i) {
-      
-      f7Card(
+    cards <- lapply(
+      seq_len(nrow(status_output)),
+      function(i) {
         
-        # make card clickable
-        div(
-          onclick = sprintf(
-            "Shiny.setInputValue(
-              'selected_project',
-              %d,
-              {priority: 'event'}
-            )",
-            i
-          ),
-        
-        # ============================================================
-        # LEVEL 1: Card
-        # ============================================================
-        div(
-          style = "
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            width:100%;
-            gap:20px;
-          ",
+        f7Card(
           
-          # ----------------------------------------------------------
-          # LEVEL 2: Left side — text/content
-          # ----------------------------------------------------------
+          # ========================================================
+          # CLICKABLE CARD
+          # ========================================================
+          
           div(
+            
+            onclick = sprintf(
+              "Shiny.setInputValue(
+                'selected_project',
+                %d,
+                {priority: 'event'}
+              )",
+              i
+            ),
+            
             style = "
-              flex:1;
               display:flex;
-              flex-direction:column;
-              justify-content:center;
+              justify-content:space-between;
+              align-items:center;
+              width:100%;
+              gap:20px;
+              cursor:pointer;
             ",
             
-            # LEVEL 3: Project name
+            # ======================================================
+            # LEFT SIDE — TEXT/CONTENT
+            # ======================================================
+            
             div(
               style = "
+                flex:1;
                 display:flex;
-                align-items:baseline;
-                margin-bottom:6px;
+                flex-direction:column;
+                justify-content:center;
               ",
-              h2(
-                status_output$project[i],
-                style = "margin:0;"
-                )
-              ),
-            # LEVEL 3: Project hours
-            div(
-              style = "
-                display:flex;
-                align-items:baseline;
-                margin-bottom:6px;
-              ",
-              span(
-                sprintf("%.1f hours", status_output$sum_hours[i]),
+              
+              # Project name
+              div(
                 style = "
-                  font-weight:600;
-                  color:#666;
+                  display:flex;
+                  align-items:baseline;
+                  margin-bottom:6px;
+                ",
+                
+                h2(
+                  status_output$project[i],
+                  style = "margin:0;"
+                )
+              ),
+              
+              # Project hours
+              div(
+                style = "
+                  display:flex;
+                  align-items:baseline;
+                  margin-bottom:6px;
+                ",
+                
+                span(
+                  sprintf(
+                    "%.1f hours",
+                    status_output$sum_hours[i]
+                  ),
+                  
+                  style = "
+                    font-weight:600;
+                    color:#666;
+                  "
+                )
+              ),
+              
+              # Long label
+              div(
+                style = "
+                  display:flex;
+                  align-items:center;
+                  gap:6px;
+                ",
+                
+                status_output$long_label[i]
+              ),
+              
+              # Hours to next level
+              div(
+                style = "
+                  display:flex;
+                  align-items:center;
+                  gap:6px;
+                ",
+                
+                paste0(
+                  floor(
+                    status_output$hours_to_next_level[i]
+                  ),
+                  "h ",
+                  round(
+                    (
+                      status_output$hours_to_next_level[i] %% 1
+                    ) * 60
+                  ),
+                  "m to next level"
+                )
+              )
+            ),
+            
+            # ======================================================
+            # RIGHT SIDE — IMAGE
+            # ======================================================
+            
+            div(
+              style = "
+                flex:0 0 140px;
+                display:flex;
+                justify-content:center;
+                align-items:center;
+              ",
+              
+              tags$img(
+                src = paste0(
+                  "images/",
+                  status_output$image_file[i]
+                ),
+                
+                style = "
+                  width:140px;
+                  height:140px;
+                  object-fit:contain;
                 "
-                )
-              ),
-            # LEVEL 3: Long label (Lvl. x [Guild] [Rank])
-            div(
-              style = "
-                display:flex;
-                align-items:center;
-                gap:6px;
-              ",
-              status_output$long_label[i]
-              ),
-            div(
-              style = "
-                display:flex;
-                align-items:center;
-                gap:6px;
-              ",
-              paste0(
-                floor(status_output$hours_to_next_level[i]),
-                "h",
-                " ",
-                round((status_output$hours_to_next_level[i] %% 1) * 60),
-                "m",
-                " to next level"
-                  )
-                )
-            ), # ------------END LEVEL 2: Left side ------------------
-          # ----------------------------------------------------------
-          # LEVEL 2: Right side — image
-          # ----------------------------------------------------------
-          div(
-            style = "
-              flex:0 0 140px;
-              display:flex;
-              justify-content:center;
-              align-items:center;
-            ",
-            # LEVEL 3: Image
-            tags$img(
-              src = paste0("images/", status_output$image_file[i]),
-              style = "
-                width:140px;
-                height:140px;
-                object-fit:contain;
-              "
-              ),
-            style = "
-                width:140px;
-                height:140px;
-                object-fit:contain;
-              "
-            ) # ------------ END LEVEL 2: Right side ----------------
-          ) # ================ END LEVEL 1: CARD ====================
+              )
+            )
+          )
         )
-      )
-     })
-  tagList(cards)
-})
+      }
+    )
+    
+    tagList(cards)
+  })
+  
+  
   # ==============================================================
   # WHEN A CARD IS CLICKED
   # ==============================================================
   
   observeEvent(input$selected_project, {
     
-    # Get the selected row
     selected <- input$selected_project
     
-    # Put the project name on the detail page
+    # Display selected project name
     output$selected_project <- renderText({
+      
       status_output$project[selected]
+      
     })
     
     # Navigate to detail tab
@@ -302,8 +345,50 @@ server <- function(input, output, session) {
       session = session
     )
   })
+  
+  
+  # ==============================================================
+  # EFFORT TREND
+  # ==============================================================
+  
+  output$effort_trend <- renderPlot({
+    
+    req(input$selected_project)
+    
+    selected <- status_output$project[
+      input$selected_project
+    ]
+    
+    entries_clean |>
+      filter(
+        project == selected,
+        week >= week(Sys.Date()) - 12,
+        week <= week(Sys.Date())
+      ) |>
+      dplyr::group_by(week_date) |>
+      dplyr::summarize(
+        hours = sum(duration_hrs),
+        .groups = "drop"
+      ) |>
+      ggplot2::ggplot(
+        ggplot2::aes(
+          x = week_date,
+          y = hours
+        )
+      ) +
+      ggplot2::geom_col(
+        fill = "orange2"
+      ) +
+      ggplot2::theme_classic() +
+      ggplot2::theme(
+        panel.grid = element_blank()
+      ) +
+      ggplot2::labs(
+        x = "Date",
+        y = "Hours"
+      )
+  })
 }
-
 
 
 shinyApp(ui, server)
