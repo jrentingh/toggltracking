@@ -119,6 +119,9 @@ status_output <- status |>
   
 
 # shiny build -----------------------------------------------------------------
+
+## ui --------------------------------
+
 ui <- f7Page(
   title = "Projects",
   
@@ -127,54 +130,50 @@ ui <- f7Page(
       title = "Projects"
     ),
     
+    #### tabs ------------
+    
     f7Tabs(
       id = "tabs",
       
-      # ==================================================
-      # PROJECT LIST
-      # ==================================================
+      # tab - projects list
       
       f7Tab(
         tabName = "projects",
         active = TRUE,
-        
         uiOutput("project_cards")
       ),
       
-      # ==================================================
-      # DETAIL PAGE
-      # ==================================================
+      # tab - detail page
       
       f7Tab(
         tabName = "project_detail",
         hidden = TRUE,
+        
+        ## navigation bar
         
         f7Navbar(
           title = "Project Details",
           backLink = TRUE
         ),
         
+        ## plot
+        
         f7Block(
-          h2(
-            textOutput("selected_project")
-          ),
-          
+          h2(textOutput("selected_project")),
           plotOutput(
             "effort_trend",
             height = "180px"
           )
         )
-      )
-    )
-  )
-)
+      ) # end detail page
+    ) # end tabs
+  ) # end layout
+) # end ui
 
+
+## server ----------------------------------------------------------------
 
 server <- function(input, output, session) {
-  
-  # ==============================================================
-  # PROJECT CARDS
-  # ==============================================================
   
   output$project_cards <- renderUI({
     
@@ -182,11 +181,9 @@ server <- function(input, output, session) {
       seq_len(nrow(status_output)),
       function(i) {
         
+        # level 1: card settings ------------
+        
         f7Card(
-          
-          # ========================================================
-          # CLICKABLE CARD
-          # ========================================================
           
           div(
             
@@ -208,9 +205,7 @@ server <- function(input, output, session) {
               cursor:pointer;
             ",
             
-            # ======================================================
-            # LEFT SIDE — TEXT/CONTENT
-            # ======================================================
+            ## level 2: left side - text -------------
             
             div(
               style = "
@@ -220,7 +215,7 @@ server <- function(input, output, session) {
                 justify-content:center;
               ",
               
-              # Project name
+              ### level 3: project name ------------
               div(
                 style = "
                   display:flex;
@@ -234,7 +229,7 @@ server <- function(input, output, session) {
                 )
               ),
               
-              # Project hours
+              ### level 3: project hours
               div(
                 style = "
                   display:flex;
@@ -255,7 +250,7 @@ server <- function(input, output, session) {
                 )
               ),
               
-              # Long label
+              ### level 3: long name -------------
               div(
                 style = "
                   display:flex;
@@ -266,7 +261,7 @@ server <- function(input, output, session) {
                 status_output$long_label[i]
               ),
               
-              # Hours to next level
+              ### level 3: hours to next level -------------
               div(
                 style = "
                   display:flex;
@@ -287,11 +282,9 @@ server <- function(input, output, session) {
                   "m to next level"
                 )
               )
-            ),
+            ), # end level 2: left side - text
             
-            # ======================================================
-            # RIGHT SIDE — IMAGE
-            # ======================================================
+            ## level 2: right side - image ---------------
             
             div(
               style = "
@@ -313,14 +306,13 @@ server <- function(input, output, session) {
                   object-fit:contain;
                 "
               )
-            )
-          )
-        )
-      }
-    )
-    
+            ) # end level 2: right side - image
+          ) # end level 1: card settings
+        ) # end f7Card
+      } # end function
+    ) # end lapply
     tagList(cards)
-  })
+  }) # end renderUI
   
   
   # ==============================================================
@@ -351,7 +343,11 @@ server <- function(input, output, session) {
   # EFFORT TREND
   # ==============================================================
   
-  output$effort_trend <- renderPlot({
+  output$effort_trend <- renderPlot(
+    
+    bg = "transparent", 
+    
+    {
     
     req(input$selected_project)
     
@@ -361,7 +357,7 @@ server <- function(input, output, session) {
     
     entries_clean |>
       filter(
-        project == selected,
+        project == "Cleaning",
         week >= week(Sys.Date()) - 12,
         week <= week(Sys.Date())
       ) |>
@@ -376,16 +372,31 @@ server <- function(input, output, session) {
           y = hours
         )
       ) +
-      ggplot2::geom_col(
-        fill = "orange2"
+      ggplot2::geom_line(
+        color = "orange2",
+        linewidth = 1
       ) +
-      ggplot2::theme_classic() +
+      ggplot2::geom_point(
+        color = "orange2",
+        size = 3
+      ) +
+      scale_y_continuous(
+        labels = function(x) paste0(x, "h")
+      ) +
       ggplot2::theme(
-        panel.grid = element_blank()
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey50"),
+        panel.grid.minor.y = element_blank(),
+        plot.background = element_blank(),
+        panel.background = element_blank(),
+        axis.line.x.bottom = element_line(color = "white"),
+        axis.line.y.left = element_line(color = "white"),
+        axis.text = element_text(color = "white")
       ) +
-      ggplot2::labs(
-        x = "Date",
-        y = "Hours"
+      labs(
+        x = "",
+        y = ""
       )
   })
 }
