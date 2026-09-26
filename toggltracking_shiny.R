@@ -357,7 +357,7 @@ server <- function(input, output, session) {
     
     entries_clean |>
       filter(
-        project == "Cleaning",
+        project == selected,
         week >= week(Sys.Date()) - 12,
         week <= week(Sys.Date())
       ) |>
