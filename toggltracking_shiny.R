@@ -355,22 +355,41 @@ server <- function(input, output, session) {
       input$selected_project
     ]
     
-    entries_clean |>
+    plot_data <- entries_clean |>
       filter(
         project == selected,
         week >= week(Sys.Date()) - 12,
         week <= week(Sys.Date())
       ) |>
+      group_by(project) |> 
+      complete(
+        week_date = seq.Date(
+          floor_date(Sys.Date() - weeks(12), unit = "week"),
+          floor_date(Sys.Date(), unit = "week"),
+          by = "week"
+        ),
+        fill = list(duration_hrs = 0)
+      ) |>
+      ungroup() |> 
       dplyr::group_by(week_date) |>
       dplyr::summarize(
         hours = sum(duration_hrs),
         .groups = "drop"
-      ) |>
+      ) |> 
+      mutate(
+        y_max = max(hours, na.rm = TRUE) + 1
+      )
+    
+    plot_data |> 
       ggplot2::ggplot(
         ggplot2::aes(
           x = week_date,
           y = hours
         )
+      ) +
+      ggplot2::geom_area(
+        fill = "orange2",
+        alpha = 0.2
       ) +
       ggplot2::geom_line(
         color = "orange2",
@@ -380,7 +399,14 @@ server <- function(input, output, session) {
         color = "orange2",
         size = 3
       ) +
+      scale_x_date(
+        limits = c(
+          floor_date(Sys.Date() - weeks(12), unit = "week"),
+          floor_date(Sys.Date(), unit = "week")
+        )
+      ) +
       scale_y_continuous(
+        limits = c(0, plot_data$y_max[1]),
         labels = function(x) paste0(x, "h")
       ) +
       ggplot2::theme(
