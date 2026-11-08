@@ -3,6 +3,7 @@
 library(shiny)
 library(shinyMobile)
 library(tidyverse)
+library(janitor)
 library(httr2)
 library(jsonlite)
 library(purrr)
@@ -11,23 +12,60 @@ library(writexl)
 library(webr)
 library(rsconnect)
 
-# API -------------------------------------------------------------------------
+# import and clean historical data --------------------------------------------
+
+entries_historical_raw <- read_csv("data/raw/entries_historical.csv") |> 
+  clean_names()
+
+entries_historical_clean <- entries_historical_raw |> 
+  # select vars
+  select(
+    billable,
+    start_date,
+    start_time,
+    end_date,
+    end_time,
+    duration,
+    description,
+    project
+  ) |> 
+  # clean time vars
+  mutate(
+    start = as.POSIXct(
+      paste(start_date, format(start_time)),
+      tz = "America/Detroit"
+    ),
+    stop = as.POSIXct(
+      paste(end_date, format(end_time)),
+      tz = "America/Detroit"
+    ),
+    billable = if_else(billable == "Yes", TRUE, FALSE),
+    date = date(with_tz(date(stop), "America/Detroit")),
+    week = week(date),
+    week_date = floor_date(date, unit = "week"),
+    year = year(date),
+    duration = as.integer(as.numeric(duration)),
+    duration_hrs = round(duration / 60 / 60, 2)
+  )
+
+# import recent data with API -------------------------------------------------
 
 # api configuration
 api_token <- readLines("API/toggl_API.txt")
 base_url <- "https://toggl.com"
 
-# API request - time entries
-# will eventually need a way to iterate this on a weekly/monthly basis, as I believe it limits out at 1,000 entries.
+## API request - time entries
 resp_time <- request("https://api.track.toggl.com/api/v9/me/time_entries") |>
   req_url_query(
-    start_date = "2026-07-31",
+    start_date = Sys.Date() - days(x = 30),
     end_date = paste0(as.character(Sys.Date()), "T23:59:59Z")
   ) |> 
   req_auth_basic(api_token, "api_token") |>
   req_perform()
 
+## save and export to raw
 entries <- fromJSON(resp_body_string(resp_time))
+write_csv(entries, paste0("data/raw/", "entries_", as.character(format(Sys.Date(), "%Y%m%d")), ".csv"))
 
 # API request - project names
 resp_projects <- request("https://api.track.toggl.com/api/v9/me/projects") |>
@@ -36,7 +74,7 @@ resp_projects <- request("https://api.track.toggl.com/api/v9/me/projects") |>
 
 projects <- fromJSON(resp_body_string(resp_projects))
 
-# data cleaning ---------------------------------------------------------------
+# clean new time entries ------------------------------------------------------
 
 project_names <- projects |> 
   rename(
@@ -69,11 +107,26 @@ entries_clean <- entries |>
     duration_hrs = round(duration / 60 / 60, 2)
   )
 
+# append new time entries to historical data ----------------------------------
+
+## import historical
+entries_historical_clean <- readRDS("data/clean/entries_historical_clean.rds")
+
+## save backup of historical
+write_csv(entries_historical_clean, paste0("data/clean/", "entries_historical_clean", "_", as.character(format(Sys.Date(), "%Y%m%d")), ".csv"))
+
+## append
+entries_appended <- bind_rows(entries_historical_clean, entries_clean)
+
+## export as new historical
+saveRDS(entries_appended, "data/clean/entries_historical_clean.rds")
+write_csv(entries_appended, "data/clean/entries_historical_clean.csv")
+
 # read levels table
 levels <- read_csv("data/levels_v2.csv")
 
 # collapse entries data
-entries_alltime <- entries_clean |> 
+entries_alltime <- entries_appended |> 
   group_by(project) |> 
   summarize(
     sum_hours = sum(duration_hrs, na.rm = TRUE)
