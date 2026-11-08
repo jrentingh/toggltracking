@@ -31,21 +31,44 @@ entries_historical_clean <- entries_historical_raw |>
   ) |> 
   # clean time vars
   mutate(
+    start_time = hms::as_hms(start_time - 3600),
+    end_time = hms::as_hms(end_time - 3600)
+  ) |>
+  mutate(
     start = as.POSIXct(
-      paste(start_date, format(start_time)),
-      tz = "America/Detroit"
+      paste(start_date, format(start_time))
     ),
     stop = as.POSIXct(
-      paste(end_date, format(end_time)),
-      tz = "America/Detroit"
+      paste(end_date, format(end_time))
     ),
     billable = if_else(billable == "Yes", TRUE, FALSE),
-    date = date(with_tz(date(stop), "America/Detroit")),
+    date = date(stop),
     week = week(date),
     week_date = floor_date(date, unit = "week"),
     year = year(date),
     duration = as.integer(as.numeric(duration)),
     duration_hrs = round(duration / 60 / 60, 2)
+  ) |> 
+  filter(date < "2026-10-07")
+
+
+# view duplicates
+
+duplicates <- entries_appended |> 
+  filter(duplicated(duration) | duplicated(duration, fromLast = TRUE)) |> 
+  arrange(duration) |> 
+  mutate(
+    source = if_else(!is.na(start_date), "historical", "updated")
+  ) |> 
+  select(duration, start, source) |> 
+  group_by(duration) |> 
+  mutate(
+    n = n()
+  ) |> 
+  filter(n == 2) |> 
+  pivot_wider(
+    names_from = source,
+    values_from = start
   )
 
 # import recent data with API -------------------------------------------------
@@ -110,7 +133,7 @@ entries_clean <- entries |>
 # append new time entries to historical data ----------------------------------
 
 ## import historical
-entries_historical_clean <- readRDS("data/clean/entries_historical_clean.rds")
+entries_historical_clean <- readRDS("data/clean/entries_historical_clean_20261107.rds")
 
 ## save backup of historical
 write_csv(entries_historical_clean, paste0("data/clean/", "entries_historical_clean", "_", as.character(format(Sys.Date(), "%Y%m%d")), ".csv"))
@@ -118,15 +141,22 @@ write_csv(entries_historical_clean, paste0("data/clean/", "entries_historical_cl
 ## append
 entries_appended <- bind_rows(entries_historical_clean, entries_clean)
 
+# dedupe
+entries_deduped <- entries_appended |> 
+  mutate(
+    id = paste0(project, as.character(start), as.character(stop))
+  ) |> 
+  distinct(id, .keep_all = TRUE)
+
 ## export as new historical
-saveRDS(entries_appended, "data/clean/entries_historical_clean.rds")
-write_csv(entries_appended, "data/clean/entries_historical_clean.csv")
+saveRDS(entries_deduped, "data/clean/entries_historical_clean.rds")
+write_csv(entries_deduped, "data/clean/entries_historical_clean.csv")
 
 # read levels table
 levels <- read_csv("data/levels_v2.csv")
 
 # collapse entries data
-entries_alltime <- entries_appended |> 
+entries_alltime <- entries_deduped |> 
   group_by(project) |> 
   summarize(
     sum_hours = sum(duration_hrs, na.rm = TRUE)
@@ -482,3 +512,4 @@ server <- function(input, output, session) {
 
 
 shinyApp(ui, server)
+
