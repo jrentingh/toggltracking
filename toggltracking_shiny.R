@@ -12,65 +12,6 @@ library(writexl)
 library(webr)
 library(rsconnect)
 
-# import and clean historical data --------------------------------------------
-
-entries_historical_raw <- read_csv("data/raw/entries_historical.csv") |> 
-  clean_names()
-
-entries_historical_clean <- entries_historical_raw |> 
-  # select vars
-  select(
-    billable,
-    start_date,
-    start_time,
-    end_date,
-    end_time,
-    duration,
-    description,
-    project
-  ) |> 
-  # clean time vars
-  mutate(
-    start_time = hms::as_hms(start_time - 3600),
-    end_time = hms::as_hms(end_time - 3600)
-  ) |>
-  mutate(
-    start = as.POSIXct(
-      paste(start_date, format(start_time))
-    ),
-    stop = as.POSIXct(
-      paste(end_date, format(end_time))
-    ),
-    billable = if_else(billable == "Yes", TRUE, FALSE),
-    date = date(stop),
-    week = week(date),
-    week_date = floor_date(date, unit = "week"),
-    year = year(date),
-    duration = as.integer(as.numeric(duration)),
-    duration_hrs = round(duration / 60 / 60, 2)
-  ) |> 
-  filter(date < "2026-10-07")
-
-
-# view duplicates
-
-duplicates <- entries_appended |> 
-  filter(duplicated(duration) | duplicated(duration, fromLast = TRUE)) |> 
-  arrange(duration) |> 
-  mutate(
-    source = if_else(!is.na(start_date), "historical", "updated")
-  ) |> 
-  select(duration, start, source) |> 
-  group_by(duration) |> 
-  mutate(
-    n = n()
-  ) |> 
-  filter(n == 2) |> 
-  pivot_wider(
-    names_from = source,
-    values_from = start
-  )
-
 # import recent data with API -------------------------------------------------
 
 # api configuration
